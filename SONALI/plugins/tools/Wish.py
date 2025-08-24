@@ -10,7 +10,7 @@ from pyrogram import Client, filters
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import random
 import requests
-from RAUSHAN import dev as app
+from SONALI import app
 
 SUPPORT_CHAT = "jasminemusicgc"
 
