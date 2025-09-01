@@ -6,7 +6,7 @@ from mimetypes import guess_type
 from pyrogram import filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 
-from Audify import app
+from SONALI import app
 from config import LOGGER_ID
 
 DOWNLOAD_DIR = "downloads"
