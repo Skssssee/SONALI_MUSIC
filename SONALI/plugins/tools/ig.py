@@ -1,86 +1,44 @@
-import os
-import re
-import yt_dlp
-from random import randint
-from mimetypes import guess_type
-from pyrogram import filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-
+import httpx
+from pyrogram import Client, filters
+from pyrogram.types import Message
 from SONALI import app
-from config import LOGGER_ID
 
-DOWNLOAD_DIR = "downloads"
-if not os.path.exists(DOWNLOAD_DIR):
-    os.makedirs(DOWNLOAD_DIR)
+API_URL = "https://www.alphaapis.org/Instagram/dl/v1"
 
-def is_video(file_path):
-    mime = guess_type(file_path)[0]
-    return mime and mime.startswith("video")
-
-def is_image(file_path):
-    mime = guess_type(file_path)[0]
-    return mime and mime.startswith("image")
-
-@app.on_message(filters.command(["ig", "instagram", "reel"]))
-async def download_instagram_media(client, message: Message):
+@app.on_message(filters.command(["ig", "insta"]))
+async def insta_download(client: Client, message: Message):
     if len(message.command) < 2:
-        return await message.reply_text("❗ Please provide the Instagram URL after the command.")
+        return await message.reply_text("❌ Usage: /insta [Instagram URL]")
 
-    url = message.text.split()[1]
-
-    if not re.match(r"^(https?://)?(www\.)?(instagram\.com|instagr\.am)/.*$", url):
-        return await message.reply_text("❌ The provided URL is not a valid Instagram link.")
-
-    status_msg = await message.reply_text("📥 Downloading media from Instagram...")
+    processing_message = await message.reply_text("🔄 Processing...")
 
     try:
-        ydl_opts = {
-            'outtmpl': f'{DOWNLOAD_DIR}/%(title).70s_{randint(1000,9999)}.%(ext)s',
-            'format': 'bestvideo+bestaudio/best',
-            'merge_output_format': 'mp4',
-            'quiet': True,
-            'no_warnings': True
-        }
+        instagram_url = message.command[1]
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            results = info['entries'] if 'entries' in info else [info]
+        async with httpx.AsyncClient(timeout=15.0) as http:
+            response = await http.get(API_URL, params={"url": instagram_url})
+            response.raise_for_status()
+            data = response.json()
 
-            for entry in results:
-                file_path = ydl.prepare_filename(entry)
-                if not os.path.exists(file_path):
-                    continue
+        results = data.get("result", [])
 
-                ig_url = entry.get('webpage_url', url)
-                buttons = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🌐 View on Instagram", url=ig_url)]
-                ])
+        if not results:
+            return await processing_message.edit("⚠️ No media found. Please check the link.")
 
-                await status_msg.delete()
+        for item in results:
+            download_link = item.get("downloadLink")
 
-                if is_video(file_path):
-                    await message.reply_video(
-                        video=file_path,
-                        reply_markup=buttons,
-                        supports_streaming=True
-                    )
-                elif is_image(file_path):
-                    await message.reply_photo(
-                        photo=file_path,
-                        reply_markup=buttons
-                    )
-                else:
-                    await message.reply_document(
-                        document=file_path,
-                        reply_markup=buttons
-                    )
+            if not download_link:
+                continue
 
-                os.remove(file_path)
+            if ".mp4" in download_link:
+                await message.reply_video(download_link)
+            elif any(ext in download_link for ext in (".jpg", ".jpeg", ".png", ".webp")):
+                await message.reply_photo(download_link)
+            else:
+                await message.reply_text(f"❌ Unsupported media type: {download_link}")
 
     except Exception as e:
-        error_msg = f"❌ Error while downloading:\n`{e}`"
-        try:
-            await status_msg.edit(error_msg)
-        except:
-            await message.reply_text(error_msg)
-        await app.send_message(LOGGER_ID, error_msg)
+        await processing_message.edit(f"❌ Error: {e}")
+    finally:
+        await processing_message.delete()
