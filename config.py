@@ -12,7 +12,7 @@ BOT_TOKEN = getenv("BOT_TOKEN", None)
 
 # ===============================================
 
-OWNER_ID = int(getenv("OWNER_ID", None)
+OWNER_ID = int(getenv("OWNER_ID", None))
 OWNER_USERNAME = getenv("OWNER_USERNAME", "TheSigmaCoder")
 LOGGER_ID = int(getenv("LOGGER_ID", None))
 
